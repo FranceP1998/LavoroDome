@@ -2,7 +2,7 @@
   'use strict';
   var E = window.Engine, CFG = window.CONFIG || {};
   var LS_DATA = 'fp_data_v1', LS_DIRTY = 'fp_dirty_v1';
-  var data, tab = 'oggi', editKey = null, syncState = 'locale';
+  var data, tab = 'oggi', editKey = null, syncState = 'locale', planYear = null, editPlan = null;
 
   /* ---------- utilità ---------- */
   function $(s) { return document.querySelector(s); }
@@ -153,6 +153,7 @@
     } else {
       h += '<p class="hint">Non attivo: i permessi arretrati restano da usare entro il ' + pa.scadenza + '.</p>';
     }
+    h += '<button class="secondary" id="vaiPiano" style="width:100%;margin-top:14px">Pianifica le ferie del ' + pa.anno + '</button>';
     return h + '</div>';
   }
 
@@ -170,6 +171,8 @@
   }
 
   function bindOggi() {
+    var vp = $('#vaiPiano');
+    if (vp) vp.addEventListener('click', function () { planYear = E.prossimoAnno(data).anno; editPlan = null; tab = 'pianifica'; render(); window.scrollTo(0, 0); });
     var on = $('#pgOn');
     if (!on) return;
     var anno = E.prossimoAnno(data).anno;
@@ -315,6 +318,209 @@
     });
   }
 
+
+  /* ---------- schermata PIANIFICA ---------- */
+  var GS = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
+  function ggS(h, set) { return h < 0 ? -E.giorni(-h, set.oreGiorno) : E.giorni(h, set.oreGiorno); }
+  function dataBreve(s) { var p = s.split('-'); return GS[E.dow(s)] + ' ' + (+p[2]) + ' ' + E.MESI[+p[1] - 1].slice(0, 3).toLowerCase(); }
+  function annoPiano() {
+    var st = E.statoAdesso(data); if (!st) return null;
+    if (planYear === null || planYear < st.anno) planYear = st.anno + 1;
+    return planYear;
+  }
+  function descrPeriodo(p, e) {
+    if (p.tipo === 'permOre') return 'Permesso a ore · ' + f(e.permOre) + ' ore';
+    var parts = [];
+    if (p.tipo === 'ferie') {
+      parts.push('Ferie · ' + e.ferieGg + ' ' + plural(e.ferieGg, 'giorno', 'giorni') + ' (' + f(e.ferieOre) + ' ore)');
+      if (e.festivitaGg) parts.push(e.festivitaGg + ' ' + plural(e.festivitaGg, 'festività conta', 'festività contano') + ' come permesso (' + f(e.permOre) + ' ore)');
+    } else {
+      parts.push('Permesso · ' + e.permGg + ' ' + plural(e.permGg, 'giorno', 'giorni') + ' (' + f(e.permOre) + ' ore)');
+    }
+    if (e.domenicheGratis) parts.push(e.domenicheGratis + ' ' + plural(e.domenicheGratis, 'domenica non conta', 'domeniche non contano'));
+    return parts.join(' · ');
+  }
+  function speciali(e) {
+    return e.giorni.filter(function (g) { return g.tipo !== 'ferie' && g.tipo !== 'permesso' && g.tipo !== 'permesso a ore'; })
+      .map(function (g) { return dataBreve(g.data) + ': ' + g.tipo; });
+  }
+
+  function cardPrevisione(titolo, pv, kind, set, st, pa) {
+    var fine = pv.fineAnno[kind], isF = kind === 'ferie';
+    var pianOre = isF ? pv.pianificato.ferieOre : pv.pianificato.permOre, pianGg = isF ? pv.pianificato.ferieGg : pv.pianificato.permGg;
+    var g = ggS(fine, set);
+    function riga(l, ore, cls) { return '<div class="row' + (cls ? ' ' + cls : '') + '"><span>' + l + '</span><b>' + ggS(ore, set) + ' gg · ' + f(ore) + ' ore</b></div>'; }
+    var h = '<div class="card"><h2>' + titolo + ' · a dicembre ' + pv.anno + '</h2>';
+    h += '<div class="big' + (fine < -0.004 ? ' neg' : '') + '">' + g + ' <small>' + plural(Math.abs(g), 'giorno che ti resta', 'giorni che ti restano') + '</small></div>';
+    h += '<p class="sub">' + f(fine) + ' ore in tutto</p><div class="rows">';
+    if (pv.apertura) {
+      h += riga('Arretrati a gennaio', pv.apertura[kind + 'Arretrati']);
+      h += riga('Maturano durante l’anno', pv.maturano[kind]);
+    } else {
+      h += riga('Hai adesso', st[kind].res);
+      h += riga('Maturano fino a dicembre', pv.maturano[kind]);
+    }
+    if (!isF && pv.pagamento > 0) h += '<div class="row"><span>Pagati a gennaio in busta</span><b>− ' + f(pv.pagamento) + ' ore</b></div>';
+    h += '<div class="row"><span>Pianificati</span><b>' + pianGg + ' gg · ' + f(pianOre) + ' ore</b></div>';
+    if (!isF && pv.pianificato.festivitaGg) h += '<div class="row sub2"><span>di cui festività nelle ferie</span><b>' + pv.pianificato.festivitaGg + ' gg</b></div>';
+    h += riga('Ti restano a dicembre', fine);
+    h += '</div>';
+    if (fine < -0.004) {
+      h += '<div class="note bad">Con questo piano non bastano: mancano ' + f(-fine) + ' ore (' + (-g) + ' gg).</div>';
+    } else {
+      var neg = pv.mesi.filter(function (m) { return m[kind] < -0.004; });
+      if (neg.length) h += '<div class="note">In ' + (neg.length === 1 ? E.MESI[neg[0].m - 1].toLowerCase() : 'alcuni mesi, da ' + E.MESI[neg[0].m - 1].toLowerCase() + ' a ' + E.MESI[neg[neg.length - 1].m - 1].toLowerCase()) +
+        ' il saldo scende sotto zero: le ore maturano mese per mese, quindi quei giorni potrebbero non essere ancora disponibili.</div>';
+    }
+    if (pv.apertura && pv.marzo && pv.marzo[kind] > 0.004) {
+      h += '<div class="note info">Promemoria: entro il ' + (pa ? pa.scadenza : '31 marzo') + ' risultano ancora da usare ' + f(pv.marzo[kind]) + ' ore (' + ggS(pv.marzo[kind], set) + ' gg) di ' + (isF ? 'ferie' : 'permessi') + ' arretrati.</div>';
+    }
+    return h + '</div>';
+  }
+
+  function formPeriodo(p, anno) {
+    var tipo = p.tipo || 'ferie', da = p.da || (anno + '-01-02'), a = p.a || da;
+    var isNew = !p.id;
+    var h = '<div class="card"><h2>' + (isNew ? 'Nuovo periodo' : 'Modifica periodo') + '</h2>';
+    h += '<label for="pTipo">Cosa vuoi pianificare?</label><select id="pTipo">' +
+      '<option value="ferie"' + (tipo === 'ferie' ? ' selected' : '') + '>Ferie</option>' +
+      '<option value="perm"' + (tipo === 'perm' ? ' selected' : '') + '>Permesso a giorni</option>' +
+      '<option value="permOre"' + (tipo === 'permOre' ? ' selected' : '') + '>Permesso a ore</option></select>';
+    h += '<div class="grid"><div><label for="pDa" id="lDa">' + (tipo === 'permOre' ? 'Giorno' : 'Dal') + '</label><input type="date" id="pDa" value="' + da + '"></div>';
+    h += '<div id="boxA"' + (tipo === 'permOre' ? ' style="display:none"' : '') + '><label for="pA">Al (compreso)</label><input type="date" id="pA" value="' + a + '"></div>';
+    h += '<div id="boxOre"' + (tipo === 'permOre' ? '' : ' style="display:none"') + '><label for="pOre">Quante ore?</label><input type="text" inputmode="decimal" id="pOre" value="' + (typeof p.ore === 'number' ? String(p.ore).replace('.', ',') : '') + '" placeholder="es. 3"></div></div>';
+    h += '<label for="pNota">Nota (facoltativa)</label><input type="text" id="pNota" value="' + esc(p.nota || '') + '" placeholder="es. mare, matrimonio…">';
+    h += '<div id="pPrev"></div>';
+    h += '<button class="primary" id="pSalva">Salva</button>';
+    h += '<div class="grid" style="margin-top:10px"><button class="secondary" id="pAnnulla">Annulla</button>' +
+      (isNew ? '<span></span>' : '<button class="secondary danger" id="pElimina">Elimina</button>') + '</div>';
+    return h + '</div>';
+  }
+
+  function viewPianifica() {
+    var st = E.statoAdesso(data);
+    if (!st) return '<div class="card"><h2>Nessun dato</h2><p class="sub">Inserisci prima una busta paga.</p></div>';
+    var set = st.set, anno = annoPiano(), pv = E.previsione(data, anno), pa = E.prossimoAnno(data);
+    if (pa && pa.anno !== anno) pa = null;
+    var h = '<div class="card"><h2>Previsione</h2><label for="pAnno" style="margin-top:0">Anno</label><select id="pAnno">';
+    [st.anno, st.anno + 1, st.anno + 2].forEach(function (y) { h += '<option value="' + y + '"' + (y === anno ? ' selected' : '') + '>' + y + (y === st.anno ? ' (fino a dicembre)' : '') + '</option>'; });
+    h += '</select><p class="hint">Aggiungi i periodi già prenotati: qui sotto vedi quante ferie e permessi ti restano. ' +
+      (set.domenicaGratis ? 'Le domeniche dentro un periodo non vengono contate. ' : '') +
+      (set.festivitaComePermessi ? 'Le festività dentro le ferie contano come ore di permesso.' : '') + '</p></div>';
+    h += cardPrevisione('Ferie', pv, 'ferie', set, st, pa);
+    h += cardPrevisione('Permessi', pv, 'perm', set, st, pa);
+
+    // elenco periodi
+    var piano = (data.piano || []).slice().sort(function (x, y) { return x.da < y.da ? -1 : x.da > y.da ? 1 : 0; });
+    var lastK = E.latestReal(data), lastP = E.parseKey(lastK), lastYM = lastP.y + '-' + (lastP.m < 10 ? '0' : '') + lastP.m;
+    h += '<div class="card"><h2>Periodi pianificati</h2><div class="list">';
+    if (!piano.length) h += '<p class="sub">Ancora nessun periodo.</p>';
+    piano.forEach(function (p) {
+      var e = E.espandiPeriodo(p, set, data.festivitaExtra || []);
+      var fineP = (p.a || p.da), passato = fineP.slice(0, 7) <= lastYM;
+      h += '<button class="item" data-id="' + esc(p.id) + '"><div class="t">' + E.etichettaPeriodo(p) + '</div><div class="d">' + descrPeriodo(p, e) +
+        (p.nota ? ' · ' + esc(p.nota) : '') + (passato ? ' · già nelle buste paga, non conteggiato' : '') + '</div></button>';
+    });
+    h += '</div>';
+    if (editPlan === null) h += '<button class="primary" id="pNuovo">+ Aggiungi periodo</button>';
+    h += '</div>';
+    if (editPlan !== null) {
+      var cur = editPlan === 'new' ? {} : (data.piano || []).filter(function (p) { return p.id === editPlan; })[0] || {};
+      h += formPeriodo(cur, anno);
+    }
+
+    // saldo mese per mese
+    h += '<div class="card"><h2>Saldo a fine mese · ' + anno + '</h2><div class="scroll"><table><tr><th>Mese</th><th>Ferie<br>giorni</th><th>Ferie<br>ore</th><th>Permessi<br>giorni</th><th>Permessi<br>ore</th></tr>';
+    pv.mesi.forEach(function (m) {
+      function neg(v) { return v < -0.004 ? ' style="color:var(--bad)"' : ''; }
+      h += '<tr><td>' + E.MESI[m.m - 1] + '</td><td' + neg(m.ferie) + '>' + ggS(m.ferie, set) + '</td><td' + neg(m.ferie) + '>' + f(m.ferie) + '</td><td' + neg(m.perm) + '>' + ggS(m.perm, set) + '</td><td' + neg(m.perm) + '>' + f(m.perm) + '</td></tr>';
+    });
+    h += '</table></div><p class="hint">Quanto ti resterebbe alla fine di ogni mese, se prendi i periodi pianificati e non altro.</p></div>';
+
+    // festività locali
+    var extra = data.festivitaExtra || [];
+    var nazionali = E.festivita(anno, []), kk = Object.keys(nazionali).sort();
+    h += '<div class="card"><h2>Festività del ' + anno + '</h2>';
+    h += '<p class="hint" style="margin-top:0">Già considerate: ' + kk.map(function (d) { return dataBreve(d).replace(/^\S+ /, '') + ' ' + nazionali[d].toLowerCase(); }).join(', ') + '.</p>';
+    extra.slice().sort(function (x, y) { return x.data < y.data ? -1 : 1; }).forEach(function (x, i) {
+      h += '<div class="row"><span>' + dataBreve(x.data) + ' ' + x.data.slice(0, 4) + ' · ' + esc(x.nome || 'Festività locale') + '</span><button class="secondary danger" data-delfest="' + esc(x.data) + '" style="padding:4px 10px">Togli</button></div>';
+    });
+    h += '<div class="sect">Aggiungi una festività locale (es. patrono)</div><div class="grid"><div><input type="date" id="fData" value="' + anno + '-01-01"></div><div><input type="text" id="fNome" placeholder="Nome"></div></div>';
+    h += '<button class="secondary" id="fAgg" style="width:100%;margin-top:10px">Aggiungi festività</button></div>';
+    return h;
+  }
+
+  function bindPianifica() {
+    var anno = annoPiano();
+    var sel = $('#pAnno');
+    if (sel) sel.addEventListener('change', function () { planYear = +sel.value; editPlan = null; render(); });
+    document.querySelectorAll('#main .item').forEach(function (b) {
+      b.addEventListener('click', function () { editPlan = b.getAttribute('data-id'); render(); var fm = $('#pTipo'); if (fm) fm.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+    });
+    var nuovo = $('#pNuovo');
+    if (nuovo) nuovo.addEventListener('click', function () { editPlan = 'new'; render(); var fm = $('#pTipo'); if (fm) fm.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+
+    var tipoEl = $('#pTipo');
+    if (tipoEl) {
+      var set = E.settingsOf(data);
+      var leggi = function () {
+        var t = tipoEl.value, p = { tipo: t, da: $('#pDa').value, nota: $('#pNota').value.trim() };
+        if (t === 'permOre') { var o = E.parseNum($('#pOre').value); p.ore = o === null ? 0 : o; p.a = p.da; } else p.a = $('#pA').value;
+        return p;
+      };
+      var aggiorna = function () {
+        var t = tipoEl.value;
+        $('#boxA').style.display = t === 'permOre' ? 'none' : '';
+        $('#boxOre').style.display = t === 'permOre' ? '' : 'none';
+        $('#lDa').textContent = t === 'permOre' ? 'Giorno' : 'Dal';
+        var p = leggi(), box = $('#pPrev');
+        if (!p.da || (t !== 'permOre' && (!p.a || p.a < p.da))) { box.innerHTML = t !== 'permOre' && p.da && p.a && p.a < p.da ? '<div class="note bad">La data finale è prima di quella iniziale.</div>' : ''; return; }
+        var e = E.espandiPeriodo(p, set, data.festivitaExtra || []), sp = speciali(e);
+        box.innerHTML = '<div class="note info">' + descrPeriodo(p, e) + (sp.length ? '<br>' + sp.map(esc).join('<br>') : '') + '</div>';
+      };
+      ['pTipo', 'pDa', 'pA', 'pOre', 'pNota'].forEach(function (id) { var el = $('#' + id); if (el) { el.addEventListener('input', aggiorna); el.addEventListener('change', aggiorna); } });
+      // se si cambia la data iniziale e quella finale era uguale/precedente, la allineo
+      $('#pDa').addEventListener('change', function () { var a = $('#pA'); if (a && (!a.value || a.value < this.value)) { a.value = this.value; aggiorna(); } });
+      aggiorna();
+      $('#pAnnulla').addEventListener('click', function () { editPlan = null; render(); });
+      $('#pSalva').addEventListener('click', function () {
+        var p = leggi();
+        if (!p.da) { toast('Scegli la data'); return; }
+        if (p.tipo === 'permOre') { if (!(p.ore > 0)) { toast('Scrivi quante ore di permesso'); return; } }
+        else if (!p.a || p.a < p.da) { toast('Controlla le date'); return; }
+        if (p.nota === '') delete p.nota;
+        if (p.tipo !== 'permOre') delete p.ore;
+        data.piano = data.piano || [];
+        if (editPlan === 'new') { p.id = 'p' + Date.now().toString(36); data.piano.push(p); }
+        else { var i = data.piano.findIndex(function (x) { return x.id === editPlan; }); p.id = editPlan; if (i >= 0) data.piano[i] = p; else data.piano.push(p); }
+        editPlan = null;
+        commit('Periodo salvato');
+      });
+      var del = $('#pElimina');
+      if (del) del.addEventListener('click', function () {
+        if (!confirm('Eliminare questo periodo?')) return;
+        data.piano = (data.piano || []).filter(function (x) { return x.id !== editPlan; });
+        editPlan = null; commit('Periodo eliminato');
+      });
+    }
+    document.querySelectorAll('[data-delfest]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var d = b.getAttribute('data-delfest');
+        data.festivitaExtra = (data.festivitaExtra || []).filter(function (x) { return x.data !== d; });
+        commit('Festività tolta');
+      });
+    });
+    var fa = $('#fAgg');
+    if (fa) fa.addEventListener('click', function () {
+      var d = $('#fData').value, n = $('#fNome').value.trim();
+      if (!d) { toast('Scegli la data'); return; }
+      data.festivitaExtra = (data.festivitaExtra || []).filter(function (x) { return x.data !== d; });
+      data.festivitaExtra.push({ data: d, nome: n || 'Festività locale' });
+      commit('Festività aggiunta');
+    });
+    void anno;
+  }
+
   /* ---------- schermata STORICO ---------- */
   function viewStorico() {
     var ks = E.sortedKeys(data).filter(function (k) { return !data.records[k].seed; }).reverse();
@@ -357,7 +563,11 @@
     h += campoImp('i_turno', 'Ore di un turno intero', s.oreTurno);
     h += campoImp('i_ferie', 'Ferie che maturano al mese (ore)', s.rateFerie);
     h += campoImp('i_perm', 'Permessi che maturano al mese (ore)', s.ratePermessi);
-    h += '</div><button class="primary" id="salvaImp">Salva regole</button>';
+    h += '</div>';
+    h += '<div class="sect">Regole per le ferie pianificate</div>';
+    h += '<label class="opt" style="margin:0;color:var(--ink);font-size:15px"><input type="checkbox" id="i_dom"' + (s.domenicaGratis ? ' checked' : '') + '><span>Le domeniche dentro un periodo di ferie non si contano</span></label>';
+    h += '<label class="opt" style="margin:0;color:var(--ink);font-size:15px"><input type="checkbox" id="i_fest"' + (s.festivitaComePermessi ? ' checked' : '') + '><span>Le festività dentro le ferie contano come ore di permesso</span></label>';
+    h += '<button class="primary" id="salvaImp">Salva regole</button>';
     h += '<p class="hint">Servono per trasformare le ore in giorni e per calcolare la situazione a dicembre. Le cambiamo quando arriva il regolamento ufficiale.</p></div>';
     h += '<div class="card"><h2>Copie dei dati</h2>';
     if (CFG.FOGLIO_URL) h += '<p><a href="' + esc(CFG.FOGLIO_URL) + '" target="_blank" rel="noopener">Apri il Google Fogli</a> (si aggiorna da solo a ogni salvataggio)</p>';
@@ -374,7 +584,8 @@
     $('#salvaImp').addEventListener('click', function () {
       var vals = { oreGiorno: E.parseNum($('#i_giorno').value), oreTurno: E.parseNum($('#i_turno').value), rateFerie: E.parseNum($('#i_ferie').value), ratePermessi: E.parseNum($('#i_perm').value) };
       for (var k in vals) if (vals[k] === null || vals[k] <= 0) { toast('Controlla i numeri'); return; }
-      data.settings = vals; commit('Regole salvate');
+      data.settings = Object.assign({}, data.settings || {}, vals, { domenicaGratis: $('#i_dom').checked, festivitaComePermessi: $('#i_fest').checked });
+      commit('Regole salvate');
     });
     $('#risinc').addEventListener('click', function () { remotePush().then(function (ok) { toast(ok ? 'Salvato su Google' : 'Non riesco a salvare ora'); render(); }); });
   }
@@ -384,9 +595,10 @@
     oggi: '<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
     inserisci: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
     storico: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+    pianifica: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/></svg>',
     altro: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/></svg>'
   };
-  var NAMES = { oggi: 'Oggi', inserisci: 'Inserisci', storico: 'Storico', altro: 'Altro' };
+  var NAMES = { oggi: 'Oggi', pianifica: 'Pianifica', inserisci: 'Inserisci', storico: 'Storico', altro: 'Altro' };
 
   function render() {
     var nav = '';
@@ -395,11 +607,12 @@
     });
     $('#nav').innerHTML = nav;
     document.querySelectorAll('#nav button').forEach(function (b) {
-      b.addEventListener('click', function () { tab = b.getAttribute('data-t'); if (tab !== 'inserisci') editKey = null; render(); window.scrollTo(0, 0); });
+      b.addEventListener('click', function () { tab = b.getAttribute('data-t'); if (tab !== 'inserisci') editKey = null; if (tab !== 'pianifica') editPlan = null; render(); window.scrollTo(0, 0); });
     });
     var main = $('#main');
     if (tab === 'oggi') { main.innerHTML = viewOggi(); bindOggi(); }
     else if (tab === 'inserisci') { main.innerHTML = viewInserisci(); bindInserisci(); }
+    else if (tab === 'pianifica') { main.innerHTML = viewPianifica(); bindPianifica(); }
     else if (tab === 'storico') { main.innerHTML = viewStorico(); bindStorico(); }
     else { main.innerHTML = viewAltro(); bindAltro(); }
     if (tab !== 'oggi') { var st = E.statoAdesso(data); $('#aggiornato').textContent = st ? 'Aggiornato alla busta paga di ' + st.label : ''; }

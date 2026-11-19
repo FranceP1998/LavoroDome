@@ -31,6 +31,7 @@ main{max-width:640px;margin:0 auto;padding:14px 16px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:0 0 14px}
 .card h2{margin:0 0 6px;font-size:15px;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .big{font-size:44px;font-weight:700;line-height:1.05;letter-spacing:-.02em}
+.big.neg{color:var(--bad)}
 .big small{font-size:18px;font-weight:600;color:var(--muted);letter-spacing:0}
 .sub{color:var(--muted);margin:4px 0 0;font-size:15px}
 .rows{margin:12px 0 0;border-top:1px solid var(--line)}
@@ -44,8 +45,8 @@ main{max-width:640px;margin:0 auto;padding:14px 16px}
 .note.bad{background:var(--bad-bg);color:var(--bad)}
 .note.good{background:var(--soft);color:var(--ok)}
 label{display:block;font-size:14px;color:var(--muted);margin:12px 0 4px}
-input[type=text],select{width:100%;font:inherit;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
-input[type=text]:focus,select:focus{outline:2px solid var(--accent);outline-offset:0}
+input[type=text],input[type=date],select{width:100%;font:inherit;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+input[type=text]:focus,input[type=date]:focus,select:focus{outline:2px solid var(--accent);outline-offset:0}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .grid label{margin-top:6px}
 .fld{position:relative}
@@ -57,7 +58,7 @@ button.danger{color:var(--bad)}
 .hint{font-size:13px;color:var(--muted);margin:6px 0 0}
 .sect{margin:18px 0 4px;font-weight:650}
 nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom)}
-nav button{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-size:12px;padding:10px 4px 9px;display:flex;flex-direction:column;align-items:center;gap:3px}
+nav button{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-size:11.5px;padding:10px 2px 9px;display:flex;flex-direction:column;align-items:center;gap:3px}
 nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 nav button.on{color:var(--accent);font-weight:650}
 .switch{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0}

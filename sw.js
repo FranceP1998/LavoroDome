@@ -1,6 +1,6 @@
 // Service worker: tiene l'app disponibile anche senza connessione.
 // Cambia il numero di versione ogni volta che aggiorni i file, così il telefono scarica quelli nuovi.
-const VERSIONE = 'v3';
+const VERSIONE = 'v4';
 const FILE = ['./', 'index.html', 'app.js', 'engine.js', 'config.js', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'icon-512-maskable.png'];
 

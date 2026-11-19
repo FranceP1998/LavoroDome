@@ -6,7 +6,8 @@
   var MESI = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio',
     'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
 
-  var DEFAULT_SETTINGS = { oreGiorno: 5.5, oreTurno: 8, rateFerie: 11.94, ratePermessi: 2.75 };
+  var DEFAULT_SETTINGS = { oreGiorno: 5.5, oreTurno: 8, rateFerie: 11.94, ratePermessi: 2.75,
+    domenicaGratis: true, festivitaComePermessi: true };
 
   function r2(x) { return Math.round(x * 100) / 100; }
   function isNum(x) { return typeof x === 'number' && isFinite(x); }
@@ -256,6 +257,141 @@
     };
   }
 
+
+  /* ================= PIANIFICAZIONE FERIE ================= */
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+  function ymd(y, m, d) { return y + '-' + pad(m) + '-' + pad(d); }
+  function parseDate(s) { var p = String(s).split('-'); return { y: +p[0], m: +p[1], d: +p[2] }; }
+  function dow(s) { var p = parseDate(s); return new Date(Date.UTC(p.y, p.m - 1, p.d)).getUTCDay(); } // 0 = domenica
+  function addDays(s, n) {
+    var p = parseDate(s), d = new Date(Date.UTC(p.y, p.m - 1, p.d + n));
+    return ymd(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+  }
+  function pasqua(y) { // calendario gregoriano
+    var a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4,
+      f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30,
+      i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7,
+      m = Math.floor((a + 11 * h + 22 * l) / 451), mese = Math.floor((h + l - 7 * m + 114) / 31),
+      giorno = ((h + l - 7 * m + 114) % 31) + 1;
+    return ymd(y, mese, giorno);
+  }
+  /* festività nazionali italiane + quelle extra aggiunte (es. patrono) -> { 'AAAA-MM-GG': nome } */
+  function festivita(y, extra) {
+    var o = {};
+    o[ymd(y, 1, 1)] = 'Capodanno'; o[ymd(y, 1, 6)] = 'Epifania';
+    o[pasqua(y)] = 'Pasqua'; o[addDays(pasqua(y), 1)] = 'Lunedì dell’Angelo';
+    o[ymd(y, 4, 25)] = 'Liberazione'; o[ymd(y, 5, 1)] = 'Festa del lavoro'; o[ymd(y, 6, 2)] = 'Festa della Repubblica';
+    o[ymd(y, 8, 15)] = 'Ferragosto'; o[ymd(y, 11, 1)] = 'Ognissanti'; o[ymd(y, 12, 8)] = 'Immacolata';
+    o[ymd(y, 12, 25)] = 'Natale'; o[ymd(y, 12, 26)] = 'Santo Stefano';
+    (extra || []).forEach(function (x) {
+      if (x && x.data && parseDate(x.data).y === y) o[x.data] = x.nome || 'Festività locale';
+    });
+    return o;
+  }
+  var GIORNI_SETT = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
+
+  /* Espande un periodo in giorni, con le regole provvisorie:
+     - domenica dentro un periodo: gratis
+     - festività dentro un periodo di ferie: conta come permesso invece che come ferie */
+  function espandiPeriodo(p, set, extra) {
+    var out = { giorni: [], ferieOre: 0, permOre: 0, ferieGg: 0, permGg: 0, domenicheGratis: 0, festivitaGg: 0 };
+    if (p.tipo === 'permOre') {
+      var h = isNum(p.ore) ? p.ore : 0;
+      out.giorni.push({ data: p.da, cat: 'perm', ore: h, tipo: 'permesso a ore' });
+      out.permOre = h;
+      return out;
+    }
+    if (!p.da || !p.a || p.a < p.da) return out;
+    var d = p.da, guard = 0;
+    var cache = {};
+    while (d <= p.a && guard++ < 400) {
+      var y = parseDate(d).y;
+      var fest = cache[y] || (cache[y] = festivita(y, extra));
+      var isDom = dow(d) === 0, nomeFest = fest[d];
+      if (isDom && set.domenicaGratis) {
+        out.domenicheGratis++;
+        out.giorni.push({ data: d, cat: null, ore: 0, tipo: 'domenica (non conta)' });
+      } else if (p.tipo === 'ferie' && nomeFest && set.festivitaComePermessi) {
+        out.festivitaGg++; out.permGg++; out.permOre += set.oreGiorno;
+        out.giorni.push({ data: d, cat: 'perm', ore: set.oreGiorno, tipo: nomeFest + ' (conta come permesso)' });
+      } else if (p.tipo === 'ferie') {
+        out.ferieGg++; out.ferieOre += set.oreGiorno;
+        out.giorni.push({ data: d, cat: 'ferie', ore: set.oreGiorno, tipo: 'ferie' });
+      } else { // permesso a giorni
+        out.permGg++; out.permOre += set.oreGiorno;
+        out.giorni.push({ data: d, cat: 'perm', ore: set.oreGiorno, tipo: 'permesso' });
+      }
+      d = addDays(d, 1);
+    }
+    return out;
+  }
+
+  /* Simula mese per mese dall'ultima busta paga fino a dicembre di annoTarget.
+     Restituisce la previsione dell'anno e il dettaglio dei periodi pianificati. */
+  function previsione(data, annoTarget) {
+    var st = statoAdesso(data);
+    if (!st || annoTarget < st.anno) return null;
+    var set = st.set, extra = data.festivitaExtra || [];
+    var piano = data.piano || [];
+    var det = piano.map(function (p) { return { p: p, e: espandiPeriodo(p, set, extra) }; });
+    // eventi (giorni che contano) per mese
+    var ev = {};
+    det.forEach(function (x) {
+      x.e.giorni.forEach(function (g) {
+        if (!g.cat || !g.ore) return;
+        var dd = parseDate(g.data), k = dd.y + '-' + pad(dd.m);
+        (ev[k] = ev[k] || []).push(g);
+      });
+    });
+    var fRes = st.ferie.res, pRes = st.perm.res, fArr = st.ferie.arretratiRimasti, pArr = st.perm.arretratiRimasti;
+    var y = st.anno, m = st.mese;
+    var out = { anno: annoTarget, mesi: [], apertura: null, marzo: null, pagamento: 0, set: set,
+      pianificato: { ferieOre: 0, permOre: 0, ferieGg: 0, permGg: 0, festivitaGg: 0 }, dettaglio: [] };
+    while (!(y === annoTarget && m === 12)) {
+      m++; if (m === 13) { m = 1; y++; }
+      var k = y + '-' + pad(m);
+      if (m === 1) { // passaggio d'anno: i residui diventano arretrati
+        fArr = Math.max(0, fRes); pArr = Math.max(0, pRes);
+        if (y === annoTarget) out.apertura = { ferieArretrati: r2(fArr), permArretrati: r2(pArr) };
+      }
+      fRes += set.rateFerie; pRes += set.ratePermessi;
+      (ev[k] || []).sort(function (a, b) { return a.data < b.data ? -1 : 1; }).forEach(function (g) {
+        if (g.cat === 'ferie') { fRes -= g.ore; fArr -= Math.min(Math.max(fArr, 0), g.ore); }
+        else { pRes -= g.ore; pArr -= Math.min(Math.max(pArr, 0), g.ore); }
+        if (y === annoTarget) {
+          if (g.cat === 'ferie') { out.pianificato.ferieOre += g.ore; out.pianificato.ferieGg++; }
+          else { out.pianificato.permOre += g.ore; out.pianificato.permGg++; if (/conta come permesso/.test(g.tipo)) out.pianificato.festivitaGg++; }
+        }
+      });
+      if (m === 1) { // pagamento dei permessi arretrati rimasti a fine gennaio
+        var pg = data.pagaGennaio && data.pagaGennaio[String(y)];
+        if (pg && pg.attivo) {
+          var pay = isNum(pg.ore) ? Math.min(Math.max(pg.ore, 0), Math.max(pArr, 0)) : Math.max(pArr, 0);
+          pay = r2(pay); pArr -= pay; pRes -= pay;
+          if (y === annoTarget) out.pagamento = pay;
+        }
+      }
+      if (m === 3 && y === annoTarget) out.marzo = { ferie: r2(Math.max(0, fArr)), perm: r2(Math.max(0, pArr)) };
+      if (y === annoTarget) out.mesi.push({ m: m, ferie: r2(fRes), perm: r2(pRes) });
+    }
+    out.fineAnno = { ferie: r2(fRes), perm: r2(pRes) };
+    out.pianificato.ferieOre = r2(out.pianificato.ferieOre); out.pianificato.permOre = r2(out.pianificato.permOre);
+    out.maturano = { ferie: r2(12 * set.rateFerie), perm: r2(12 * set.ratePermessi) };
+    if (annoTarget === st.anno) { out.maturano = { ferie: r2((12 - st.mese) * set.rateFerie), perm: r2((12 - st.mese) * set.ratePermessi) }; }
+    out.dettaglio = det.filter(function (x) {
+      var a = parseDate(x.p.da).y, b = parseDate(x.p.a || x.p.da).y; return a <= annoTarget && b >= annoTarget;
+    });
+    return out;
+  }
+
+  function etichettaPeriodo(p) {
+    var a = parseDate(p.da), b = parseDate(p.a || p.da);
+    if (p.tipo === 'permOre' || p.da === p.a) return a.d + ' ' + MESI[a.m - 1].toLowerCase() + ' ' + a.y;
+    if (a.y === b.y && a.m === b.m) return a.d + '–' + b.d + ' ' + MESI[a.m - 1].toLowerCase() + ' ' + a.y;
+    if (a.y === b.y) return a.d + ' ' + MESI[a.m - 1].toLowerCase() + ' – ' + b.d + ' ' + MESI[b.m - 1].toLowerCase() + ' ' + a.y;
+    return a.d + ' ' + MESI[a.m - 1].toLowerCase() + ' ' + a.y + ' – ' + b.d + ' ' + MESI[b.m - 1].toLowerCase() + ' ' + b.y;
+  }
+
   var Engine = {
     MESI: MESI, DEFAULT_SETTINGS: DEFAULT_SETTINGS,
     parseNum: parseNum, fmt: fmt, giorni: giorni, turni: turni, r2: r2,
@@ -263,7 +399,9 @@
     sortedKeys: sortedKeys, latestReal: latestReal, statoAdesso: statoAdesso,
     prossimoAnno: prossimoAnno, controllaRecord: controllaRecord, mensili: mensili,
     anniConDati: anniConDati, perFoglio: perFoglio, datiIniziali: datiIniziali,
-    pagamentoGennaio: pagamentoGennaio, annoPrec: annoPrec
+    pagamentoGennaio: pagamentoGennaio, annoPrec: annoPrec,
+    festivita: festivita, espandiPeriodo: espandiPeriodo, previsione: previsione, etichettaPeriodo: etichettaPeriodo,
+    pasqua: pasqua, dow: dow, GIORNI_SETT: GIORNI_SETT
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Engine;
