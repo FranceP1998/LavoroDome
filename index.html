@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f6f5c">
+<meta name="color-scheme" content="light dark">
+<title>Ferie e permessi</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#f4f6f5; --card:#ffffff; --ink:#18221f; --muted:#5d6b66; --line:#e1e7e4;
+  --accent:#1f6f5c; --accent-ink:#ffffff; --soft:#e6f2ee; --warn:#a15c00; --warn-bg:#fff4e0;
+  --bad:#b3261e; --bad-bg:#fdecea; --ok:#1d6b3a; --yellow:#fff6d6;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0f1513; --card:#18211e; --ink:#e8efec; --muted:#9aaaa4; --line:#2a3631;
+    --accent:#4fb99b; --accent-ink:#06211a; --soft:#1d2d28; --warn:#ffcf70; --warn-bg:#3a2d12;
+    --bad:#ff8a80; --bad-bg:#3b1816; --ok:#7fd69b; --yellow:#3a3515}
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+header{background:var(--accent);color:var(--accent-ink);padding:calc(14px + env(safe-area-inset-top)) 16px 16px}
+header h1{margin:0;font-size:20px;font-weight:650}
+header p{margin:4px 0 0;font-size:14px;opacity:.9}
+.sync{display:inline-block;margin-top:8px;font-size:12px;padding:3px 10px;border-radius:99px;background:rgba(255,255,255,.18)}
+main{max-width:640px;margin:0 auto;padding:14px 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:0 0 14px}
+.card h2{margin:0 0 6px;font-size:15px;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.big{font-size:44px;font-weight:700;line-height:1.05;letter-spacing:-.02em}
+.big small{font-size:18px;font-weight:600;color:var(--muted);letter-spacing:0}
+.sub{color:var(--muted);margin:4px 0 0;font-size:15px}
+.rows{margin:12px 0 0;border-top:1px solid var(--line)}
+.row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:15px}
+.row:last-child{border-bottom:0}
+.row b{font-weight:650;text-align:right}
+.note{margin:10px 0 0;padding:10px 12px;border-radius:12px;background:var(--warn-bg);color:var(--warn);font-size:14px}
+.note.info{background:var(--soft);color:var(--ink)}
+.note.bad{background:var(--bad-bg);color:var(--bad)}
+.note.good{background:var(--soft);color:var(--ok)}
+label{display:block;font-size:14px;color:var(--muted);margin:12px 0 4px}
+input[type=text],select{width:100%;font:inherit;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+input[type=text]:focus,select:focus{outline:2px solid var(--accent);outline-offset:0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid label{margin-top:6px}
+.fld{position:relative}
+.fld button.pm{position:absolute;right:6px;top:6px;border:0;background:var(--soft);color:var(--ink);border-radius:8px;width:36px;height:36px;font-size:18px}
+.fld input{padding-right:48px;background:var(--yellow)}
+button.primary{width:100%;font:inherit;font-weight:650;padding:14px;border-radius:14px;border:0;background:var(--accent);color:var(--accent-ink);margin-top:16px}
+button.secondary{font:inherit;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+button.danger{color:var(--bad)}
+.hint{font-size:13px;color:var(--muted);margin:6px 0 0}
+.sect{margin:18px 0 4px;font-weight:650}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-size:12px;padding:10px 4px 9px;display:flex;flex-direction:column;align-items:center;gap:3px}
+nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--accent);font-weight:650}
+.switch{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0}
+.switch input{width:48px;height:28px;accent-color:var(--accent)}
+.opt{display:flex;gap:10px;align-items:center;padding:8px 0;font-size:15px}
+.opt input{width:20px;height:20px;accent-color:var(--accent)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:600;font-size:12px}
+.scroll{overflow-x:auto;margin:0 -6px}
+.list .item{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;color:inherit;font:inherit;padding:12px 0}
+.list .item:last-child{border-bottom:0}
+.list .t{font-weight:650}
+.list .d{font-size:13px;color:var(--muted)}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));background:#18221f;color:#fff;padding:12px 14px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:608px;margin:0 auto}
+.toast.on{opacity:1}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Ferie e permessi</h1>
+  <p id="aggiornato"></p>
+  <span class="sync" id="sync">…</span>
+</header>
+<main id="main"></main>
+<nav id="nav"></nav>
+<div class="toast" id="toast"></div>
+<script src="config.js"></script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
