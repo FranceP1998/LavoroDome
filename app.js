@@ -97,13 +97,18 @@
     h += '<div class="big">' + gi + ' <small>' + plural(gi, 'giorno', 'giorni') + '</small></div>';
     h += '<p class="sub">' + f(st.res) + ' ore in tutto · 1 giorno = ' + fp(set.oreGiorno) + ' ore</p>';
     h += '<div class="rows">';
-    if (st.arretratiRimasti > 0) {
-      h += '<div class="row"><span>Arretrati dell’anno scorso ancora da usare</span><b>' + f(st.arretratiRimasti) + ' ore (' + E.giorni(st.arretratiRimasti, set.oreGiorno) + ' gg)</b></div>';
-    } else {
-      h += '<div class="row"><span>Arretrati dell’anno scorso</span><b>' + (st.arretratiUsati > 0 ? 'già usati' : 'nessuno') + '</b></div>';
-    }
     h += '<div class="row"><span>Maturati quest’anno</span><b>' + f(st.mat) + ' ore</b></div>';
-    h += '<div class="row"><span>Goduti quest’anno</span><b>' + f(st.god) + ' ore (' + E.giorni(st.god, set.oreGiorno) + ' gg)</b></div>';
+    var godGg = E.giorni(st.god, set.oreGiorno);
+    h += '<div class="row"><span>Goduti quest’anno</span><b>' + godGg + ' gg · ' + f(st.god) + ' ore</b></div>';
+    if (st.prec > 0) {
+      var arrGg = Math.min(E.giorni(st.arretratiUsati, set.oreGiorno), godGg);
+      var annoOre = Math.max(0, E.r2(st.god - st.arretratiUsati));
+      h += '<div class="row sub2"><span>di cui dell’anno scorso</span><b>' + arrGg + ' gg · ' + f(st.arretratiUsati) + ' ore</b></div>';
+      h += '<div class="row sub2"><span>di cui di quest’anno</span><b>' + (godGg - arrGg) + ' gg · ' + f(annoOre) + ' ore</b></div>';
+    }
+    if (st.arretratiRimasti > 0) {
+      h += '<div class="row"><span>Arretrati ancora da usare</span><b>' + f(st.arretratiRimasti) + ' ore (' + E.giorni(st.arretratiRimasti, set.oreGiorno) + ' gg)</b></div>';
+    }
     h += '<div class="row"><span>A dicembre, se non usi altro</span><b>' + gf + ' gg · ' + f(st.fineAnno) + ' ore</b></div>';
     h += '</div>';
     if (Math.abs(st.diff) > 0.01) h += '<div class="note bad">Attenzione: i numeri di questa busta paga non tornano tra loro (differenza ' + f(st.diff) + ' ore). Controlla in “Inserisci”.</div>';

@@ -3,21 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1f6f5c">
+<meta name="theme-color" content="#6b3fa0">
 <meta name="color-scheme" content="light dark">
-<title>Ferie e permessi</title>
+<title>Ferie, Permessi e Banca Ore</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
 :root{
-  --bg:#f4f6f5; --card:#ffffff; --ink:#18221f; --muted:#5d6b66; --line:#e1e7e4;
-  --accent:#1f6f5c; --accent-ink:#ffffff; --soft:#e6f2ee; --warn:#a15c00; --warn-bg:#fff4e0;
+  --bg:#f6f3fa; --card:#ffffff; --ink:#1f1830; --muted:#625a75; --line:#e4dcef;
+  --accent:#6b3fa0; --accent-ink:#ffffff; --soft:#efe8f7; --warn:#a15c00; --warn-bg:#fff4e0;
   --bad:#b3261e; --bad-bg:#fdecea; --ok:#1d6b3a; --yellow:#fff6d6;
 }
 @media (prefers-color-scheme:dark){
-  :root{--bg:#0f1513; --card:#18211e; --ink:#e8efec; --muted:#9aaaa4; --line:#2a3631;
-    --accent:#4fb99b; --accent-ink:#06211a; --soft:#1d2d28; --warn:#ffcf70; --warn-bg:#3a2d12;
+  :root{--bg:#14101c; --card:#1e1829; --ink:#ece7f5; --muted:#a79fba; --line:#352b48;
+    --accent:#b99aef; --accent-ink:#1d0f35; --soft:#2b2140; --warn:#ffcf70; --warn-bg:#3a2d12;
     --bad:#ff8a80; --bad-bg:#3b1816; --ok:#7fd69b; --yellow:#3a3515}
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -37,6 +37,8 @@ main{max-width:640px;margin:0 auto;padding:14px 16px}
 .row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:15px}
 .row:last-child{border-bottom:0}
 .row b{font-weight:650;text-align:right}
+.row.sub2{padding:6px 0 6px 14px;font-size:14px;color:var(--muted)}
+.row.sub2 b{font-weight:600;color:var(--ink)}
 .note{margin:10px 0 0;padding:10px 12px;border-radius:12px;background:var(--warn-bg);color:var(--warn);font-size:14px}
 .note.info{background:var(--soft);color:var(--ink)}
 .note.bad{background:var(--bad-bg);color:var(--bad)}
@@ -71,14 +73,14 @@ th{color:var(--muted);font-weight:600;font-size:12px}
 .list .item:last-child{border-bottom:0}
 .list .t{font-weight:650}
 .list .d{font-size:13px;color:var(--muted)}
-.toast{position:fixed;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));background:#18221f;color:#fff;padding:12px 14px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:608px;margin:0 auto}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));background:#2a1f3f;color:#fff;padding:12px 14px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:608px;margin:0 auto}
 .toast.on{opacity:1}
 a{color:var(--accent)}
 </style>
 </head>
 <body>
 <header>
-  <h1>Ferie e permessi</h1>
+  <h1>Ferie, Permessi e Banca Ore</h1>
   <p id="aggiornato"></p>
   <span class="sync" id="sync">…</span>
 </header>
