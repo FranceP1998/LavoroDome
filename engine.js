@@ -223,14 +223,15 @@
     });
     // anno successivo senza ancora buste paga: serve solo il pagamento previsto
     var pa = prossimoAnno(data);
-    if (pa && !out.years[pa.anno] && pa.pagaGennaio && pa.pagaGennaio.attivo) {
+    // (anche quando è spento: così il foglio viene svuotato se cambi idea)
+    if (pa && !out.years[pa.anno]) {
       out.years[pa.anno] = {
         ferieGod: { v: new Array(12).fill(null), span: new Array(12).fill(null) },
         permGod: { v: new Array(12).fill(null), span: new Array(12).fill(null) },
         bancaMat: { v: new Array(12).fill(null), span: new Array(12).fill(null) },
         bancaGod: { v: new Array(12).fill(null), span: new Array(12).fill(null) },
         apertura: { ferie: null, perm: null, banca: null },
-        pagamentoGennaio: pa.permPagati
+        pagamentoGennaio: pa.pagaGennaio && pa.pagaGennaio.attivo ? pa.permPagati : 0
       };
     }
     return out;
